@@ -1,4 +1,3 @@
-// src/models/User.js
 import mongoose from 'mongoose';
 
 const userSchema = new mongoose.Schema({
@@ -8,15 +7,24 @@ const userSchema = new mongoose.Schema({
         unique: true,
         trim: true
     },
-    // y = g^x mod p
     publicKeyY: {
         type: String,
         required: true
     },
-    // z = h^x mod p
     publicKeyZ: {
         type: String,
-        required: true  // now required
+        required: true
+    },
+    // ⬇️ Added for TOTP backup/recovery
+    totpSecret: {
+        type: String,
+        required: false, // Optional for users who don’t have a mobile TOTP
+        default: null
+    },
+    // ⬇️ Added for recovery token support
+    recoveryToken: {
+        type: String,
+        default: null
     },
     createdAt: {
         type: Date,
@@ -24,4 +32,7 @@ const userSchema = new mongoose.Schema({
     }
 });
 
-export default mongoose.model('User', userSchema);
+// Prevent overwriting model if already compiled (important for hot reload)
+const User = mongoose.models.User || mongoose.model('User', userSchema);
+
+export default User;
