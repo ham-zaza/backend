@@ -18,7 +18,7 @@ const httpServer = createServer(app);
 ======================= */
 const io = new Server(httpServer, {
     cors: {
-        origin: '*',
+        origin: '*', // (allowing all) just for the demo to prevent blocking errors
         methods: ['GET', 'POST']
     }
 });
