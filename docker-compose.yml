@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  # 1. Your Database
+  zk-mongo:
+    image: mongo:latest
+    container_name: zk_database
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+
+  # 2. Your Backend Server
+  zk-backend:
+    build: .
+    container_name: zk_server
+    ports:
+      - "3000:3000"
+    environment:
+      # 🔥 We inject the Docker MongoDB URI right here.
+      # Your db.js will automatically pick this up via process.env.MONGO_URI
+      - MONGO_URI=mongodb://zk-mongo:27017/ZK
+    depends_on:
+      - zk-mongo
+
+volumes:
+  # This makes sure your users aren't deleted if you restart Docker
+  mongo-data:

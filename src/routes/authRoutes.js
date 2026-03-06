@@ -207,5 +207,26 @@ router.get('/logs/:username', async (req, res) => {
         res.status(500).json({ message: "Error fetching logs" });
     }
 });
+// ── NEW ROUTE: Fetch System Logs for Extension ─────────────────
+// GET /api/logs
+router.get('/logs', async (req, res) => {
+    try {
+        // Fetch latest 50 logs across the whole system
+        const logs = await Log.find()
+            .sort({ timestamp: -1 })
+            .limit(50);
 
+        res.status(200).json({
+            success: true,
+            count: logs.length,
+            logs: logs
+        });
+    } catch (error) {
+        console.error("❌ Error fetching system logs:", error);
+        res.status(500).json({
+            message: "Failed to fetch logs",
+            error: error.message
+        });
+    }
+});
 export default router;

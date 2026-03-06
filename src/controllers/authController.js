@@ -1,6 +1,7 @@
 // src/controllers/authController.js
 import User from '../models/User.js';
 import { ZKP_PARAMS } from '../config/zkpParams.js';
+import Log from '../models/Log.js';
 import modExp from '../utils/modExp.js';
 import { verifyChaumPedersen } from '../services/chaumPedersenVerifier.js'; // <-- new import
 
@@ -92,5 +93,26 @@ export const verifyProof = async (req, res) => {
     } catch (err) {
         console.error("Verification error:", err);
         res.status(500).json({ error: "Server error during verification" });
+    }
+};
+// ── 4. Fetch System Logs ───────────────────────────────
+export const getLogs = async (req, res) => {
+    try {
+        // Fetch logs, sort by newest first, limit to last 50
+        const logs = await Log.find()
+            .sort({ timestamp: -1 })
+            .limit(50);
+
+        res.status(200).json({
+            success: true,
+            count: logs.length,
+            logs: logs
+        });
+    } catch (error) {
+        console.error("❌ Error fetching logs:", error);
+        res.status(500).json({
+            message: "Failed to fetch logs",
+            error: error.message
+        });
     }
 };

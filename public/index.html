@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZKP Secure Bank | Passwordless Login</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+        body { font-family: 'JetBrains Mono', monospace; }
+        .scan-line {
+            position: absolute;
+            width: 100%;
+            height: 2px;
+            background: #3b82f6;
+            animation: scan 2s infinite linear;
+            box-shadow: 0 0 10px #3b82f6;
+        }
+        @keyframes scan {
+            0% { top: 0; }
+            100% { top: 100%; }
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-200 h-screen flex items-center justify-center overflow-hidden relative">
+
+<div class="absolute inset-0 opacity-10 pointer-events-none"
+     style="background-image: radial-gradient(#3b82f6 1px, transparent 1px); background-size: 30px 30px;">
+</div>
+
+<div id="login-container" class="bg-slate-900 border border-slate-800 p-8 rounded-2xl shadow-2xl w-full max-w-md relative z-10 text-center transition-all duration-500">
+
+    <div class="mb-8">
+        <div class="inline-block p-4 rounded-full bg-blue-900/20 border border-blue-500/50 mb-4">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+        </div>
+        <h1 class="text-2xl font-bold text-white tracking-wider uppercase">ZKP Secure Bank</h1>
+        <p class="text-xs text-slate-500 mt-2">Zero-Knowledge Authentication Portal</p>
+    </div>
+
+    <div class="relative inline-block p-2 bg-white rounded-lg mb-6 group cursor-pointer" onclick="window.location.reload()" title="Click to Refresh Session">
+        <div id="qrcode"></div>
+        <div class="scan-line pointer-events-none"></div>
+    </div>
+
+    <p class="text-xs text-slate-400 mb-6">
+        Scan via <span class="text-blue-400 font-bold">ZK-Auth Mobile App</span> to login.<br>
+        No password will be transmitted.
+    </p>
+
+    <div class="bg-slate-950 rounded p-3 text-[10px] text-slate-500 font-mono text-left border border-slate-800">
+        <p>SESSION_ID: <span id="session-display" class="text-blue-500">Generating...</span></p>
+        <p>STATUS: <span id="status-text" class="text-yellow-500 animate-pulse">WAITING_FOR_PROOF...</span></p>
+    </div>
+</div>
+
+<div id="success-container" class="hidden text-center z-10">
+    <div class="mb-6 animate-bounce">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-24 w-24 text-emerald-500 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+    </div>
+    <h2 class="text-3xl font-black text-white mb-2">ACCESS GRANTED</h2>
+    <p class="text-slate-400 mb-8">Identity Verified via Zero-Knowledge Proof</p>
+
+    <div class="bg-slate-900 border border-emerald-500/30 p-6 rounded-lg text-left max-w-md mx-auto">
+        <p class="text-xs text-slate-500 uppercase font-bold mb-2">User Profile</p>
+        <h3 class="text-xl text-emerald-400 font-mono mb-4" id="user-name">Unknown</h3>
+
+        <div class="h-px bg-slate-800 my-4"></div>
+
+        <p class="text-[10px] text-slate-500 mb-1">PROOF HASH (Dynamically Generated):</p>
+        <p class="text-[10px] text-slate-300 break-all font-mono bg-black p-2 rounded border border-slate-800">
+            0x<span id="proof-hash">...</span>
+        </p>
+    </div>
+
+    <button onclick="window.location.reload()" class="mt-8 px-6 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-sm font-bold uppercase tracking-widest border border-slate-700 transition-all">
+        Logout
+    </button>
+</div>
+
+<script>
+    const socket = io();
+    const sessionId = crypto.randomUUID(); // UNIQUE EVERY TIME
+
+    // Display Session ID
+    document.getElementById('session-display').innerText = sessionId.substring(0, 18) + '...';
+
+    // Generate QR
+    // Format matches what Mobile App expects: { sessionId: "..." }
+    new QRCode(document.getElementById("qrcode"), {
+        text: JSON.stringify({ sessionId: sessionId }),
+        width: 180,
+        height: 180,
+        colorDark : "#000000",
+        colorLight : "#ffffff",
+        correctLevel : QRCode.CorrectLevel.H
+    });
+
+    // Join Socket Room
+    socket.emit('register_web_client', sessionId);
+
+    // Listen for Login Success
+    socket.on('login_success', (data) => {
+        console.log("Login Success:", data);
+
+        // 🔥 NEW: Tell the Extension that login happened
+        window.postMessage({ type: "ZK_LOGIN_SUCCESS", username: data.username }, "*");
+
+        // UI Transition
+        document.getElementById('login-container').classList.add('hidden');
+        document.getElementById('success-container').classList.remove('hidden');
+
+        // Populate Data
+        document.getElementById('user-name').innerText = data.username;
+
+        // Fake a dynamic hash for demo visualization
+        const randomHash = Array.from({length: 64}, () => Math.floor(Math.random()*16).toString(16)).join('');
+        document.getElementById('proof-hash').innerText = randomHash;
+    });
+</script>
+</body>
+</html>
